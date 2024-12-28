@@ -12,6 +12,8 @@
 		"db:studio": "drizzle-kit studio"
 	},
 	"devDependencies": {
+		"@skeletonlabs/skeleton": "^3.0.0-next.10",
+		"@skeletonlabs/skeleton-svelte": "^1.0.0-next.16",
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -23,7 +25,15 @@
 		"vite": "^5.4.11"
 	},
 	"dependencies": {
+		"@metamask/eth-sig-util": "^8.1.2",
 		"better-sqlite3": "^11.1.2",
-		"drizzle-orm": "^0.33.0"
+		"buffer": "^6.0.3",
+		"drizzle-orm": "^0.33.0",
+		"eth-crypto": "^2.7.0",
+		"eth-crypto-js": "^0.2.18",
+		"ethers": "^6.13.4",
+		"process": "^0.11.10",
+		"rollup-plugin-node-polyfills": "^0.2.1",
+		"secp256k1": "^5.0.1"
 	}
 }
