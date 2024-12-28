@@ -1,174 +1,73 @@
 <script>
-    import { onMount } from 'svelte';
-    import Crypto from '$lib/crypto'; // Assuming the class is in lib/crypto.js
-    
-    let crypto;
-    let message = '';
-    let encrypted = '';
-    let decrypted = '';
-    let error = '';
-    let encryptionKeys;
-    let iv;
+    import { goto } from '$app/navigation';
 
-    // Store for persisting keys between encryptions
-    let encryptionKey;
+    let publicKey = "";
+    let error = "";
 
-    onMount(async () => {
+    async function validateAndStore() {
         try {
-            crypto = new Crypto();
-            // Generate encryption keys on component mount
-            encryptionKeys = await crypto.generateEncryptionKeys();
+            // Validate base64
+            const binaryKey = Uint8Array.from(atob(publicKey), c => c.charCodeAt(0));
             
-            // Derive an AES key for encryption/decryption
-            const sharedBits = await window.crypto.subtle.deriveBits(
+            // Try to import as SPKI public key
+            await window.crypto.subtle.importKey(
+                "spki",
+                binaryKey,
                 {
-                    name: "ECDH",
-                    public: encryptionKeys.publicKey
+                    name: "ECDSA",
+                    namedCurve: "P-256"
                 },
-                encryptionKeys.privateKey,
-                256
+                true,
+                ["verify"]
             );
 
-            // Import the derived bits as an AES key
-            encryptionKey = await window.crypto.subtle.importKey(
-                "raw",
-                sharedBits,
-                "AES-GCM",
-                false,
-                ["encrypt", "decrypt"]
-            );
+            // cookie for 30days
+            document.cookie = `vault_pubkey=${encodeURIComponent(publicKey)};path=/;max-age=2592000;SameSite=Strict`;
+            
+            goto('/dashboard');
         } catch (err) {
-            error = `Initialization failed: ${err.message}`;
-            console.error('Initialization failed:', err);
+            error = "Invalid public key format. Please use a valid ECDSA P-256 public key in base64 format.";
+            console.error(err);
         }
-    });
-
-    async function handleEncrypt() {
-        try {
-            error = '';
-            if (!message) {
-                throw new Error('Please enter a message to encrypt');
-            }
-            if (!encryptionKey) {
-                throw new Error('Encryption key not initialized');
-            }
-
-            const result = await crypto.encrypt(message, encryptionKey);
-            // Store the IV for decryption
-            iv = result.iv;
-            // Convert the encrypted data to base64 for display
-            encrypted = btoa(
-                String.fromCharCode.apply(null, 
-                    new Uint8Array(result.encrypted)
-                )
-            );
-        } catch (err) {
-            error = err.message;
-            console.error('Encryption failed:', err);
-        }
-    }
-
-    async function handleDecrypt() {
-        try {
-            error = '';
-            if (!encrypted) {
-                throw new Error('No encrypted message to decrypt');
-            }
-            if (!encryptionKey) {
-                throw new Error('Decryption key not initialized');
-            }
-
-            // Convert base64 back to ArrayBuffer
-            const encryptedData = new Uint8Array(
-                atob(encrypted)
-                    .split('')
-                    .map(char => char.charCodeAt(0))
-            ).buffer;
-
-            decrypted = await crypto.decrypt(encryptedData, encryptionKey, iv);
-        } catch (err) {
-            error = err.message;
-            console.error('Decryption failed:', err);
-        }
-    }
-
-    function clearAll() {
-        message = '';
-        encrypted = '';
-        decrypted = '';
-        error = '';
     }
 </script>
 
-<div class="p-4">
-    <div class="space-y-4">
-        <!-- Message Input -->
-        <div class="flex flex-col space-y-2">
-            <label for="message" class="text-sm font-medium text-gray-700">
-                Message to Encrypt
-            </label>
-            <div class="flex space-x-2">
+<div class="min-h-screen bg-gradient-to-br from-[#1e1e2e] to-[#302d41] p-4">
+    <div class="container mx-auto max-w-3xl">
+        <div class="backdrop-blur-lg bg-[#1e1e2e]/70 border border-[#6e6c7e]/20 rounded-xl shadow-xl p-6">
+            <h2 class="text-2xl font-bold mb-2 text-[#cdd6f4]">The Vault</h2>
+            <p class="text-[#a6adc8] mb-6">Your encrypted cloud storage, secured by you.</p>
+
+            <div class="mb-6 space-y-2">
+                <label class="block text-sm font-medium text-[#cdd6f4]">
+                    Your Public Key (Base64 SPKI format)
+                </label>
                 <input 
-                    id="message"
-                    bind:value={message} 
-                    placeholder="Enter message" 
-                    class="flex-1 border text-black p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    type="text"
+                    bind:value={publicKey}
+                    placeholder="Paste your public key here..."
+                    class="w-full p-2.5 rounded-lg bg-[#313244]/50 border border-[#6e6c7e]/50 
+                           text-[#cdd6f4] focus:ring-2 focus:ring-[#89b4fa] focus:border-[#89b4fa]"
                 />
-                <button 
-                    on:click={handleEncrypt}
-                    disabled={!message}
-                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    Encrypt
-                </button>
+                {#if error}
+                    <p class="text-[#f38ba8] text-sm">{error}</p>
+                {/if}
+            </div>
+
+            <button 
+                on:click={validateAndStore}
+                class="w-full bg-gradient-to-r from-[#89b4fa] to-[#cba6f7] hover:from-[#74c7ec] hover:to-[#f5c2e7] 
+                       text-[#1e1e2e] font-medium py-2.5 px-4 rounded-lg transition-all duration-300 
+                       shadow-lg hover:shadow-[#89b4fa]/25"
+            >
+                Enter Vault
+            </button>
+
+            <div class="mt-6 p-4 bg-[#313244]/30 rounded-lg">
+                <p class="text-[#a6adc8] text-sm">
+                    Don't have a key pair? <a href="/keys" class="text-[#89b4fa] hover:text-[#74c7ec]">Generate one here</a>
+                </p>
             </div>
         </div>
-
-        <!-- Encrypted Message -->
-        {#if encrypted}
-            <div class="space-y-2">
-                <label class="text-sm font-medium text-gray-700">
-                    Encrypted Message
-                </label>
-                <div class="p-3 bg-gray-100 rounded break-all text-black">
-                    {encrypted}
-                </div>
-                <button 
-                    on:click={handleDecrypt}
-                    class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                >
-                    Decrypt
-                </button>
-            </div>
-        {/if}
-
-        <!-- Decrypted Message -->
-        {#if decrypted}
-            <div class="space-y-2">
-                <label class="text-sm font-medium text-gray-700">
-                    Decrypted Message
-                </label>
-                <div class="p-3 bg-gray-100 rounded text-black">
-                    {decrypted}
-                </div>
-            </div>
-        {/if}
-
-        <!-- Error Message -->
-        {#if error}
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-                <span class="block sm:inline">{error}</span>
-            </div>
-        {/if}
-
-        <!-- Clear Button -->
-        {#if message || encrypted || decrypted}
-            <button 
-                on:click={clearAll}
-                class="mt-4 text-gray-600 hover:text-gray-800 underline focus:outline-none"
-            >
-                Clear All
-            </button>
-        {/if}
     </div>
 </div>
